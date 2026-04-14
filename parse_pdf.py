@@ -45,7 +45,11 @@ def parse_questions_from_text(text, default_section="EVS"):
 
         # Match question number at start of line
         # Patterns: "1. question", "1) question", "1 question", "Q1. question", "Q.1 question"
+        # Also handles stuck-together: "7In which..." -> number=7, text="In which..."
         q_match = re.match(r'^(?:Q\.?\s*)?(\d+)[.):\s]\s*(.+)', line)
+        if not q_match:
+            # Try stuck-together pattern: "7In", "10Madhav", "123The"
+            q_match = re.match(r'^(\d+)([A-Z][a-zA-Z].*)', line)
         if not q_match:
             i += 1
             continue

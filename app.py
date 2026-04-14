@@ -612,9 +612,10 @@ def pdf_upload_page():
 
         section_default = st.selectbox(
             "Default section for questions in this PDF",
-            ["EVS", "EST"],
-            help="Questions will be tagged with this section unless the PDF contains section markers"
+            ["EVS (Auto-detect EST)", "EST (Auto-detect EVS)"],
+            help="Starting section — the parser auto-switches when it finds 'EVS Questions' or 'EST MCQ' headers in the PDF"
         )
+        section_default = "EVS" if "EVS" in section_default else "EST"
 
         if st.button("Parse PDF", type="primary", use_container_width=True):
             with st.spinner("Parsing PDF... This may take a moment for large files."):
