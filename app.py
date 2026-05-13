@@ -164,18 +164,21 @@ def navigate(page):
 
 def home_page(all_questions):
     """Render the home/configuration page."""
-    st.markdown('<div class="main-header"><h1>🌿 EVS & EST Quiz Engine</h1><p>Environmental Studies Test Platform</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>🌿 EVS, EST & KIDO Quiz Engine</h1><p>Environmental Studies Test Platform</p></div>', unsafe_allow_html=True)
 
     evs_qs = [q for q in all_questions if q.get('section') == 'EVS']
     est_qs = [q for q in all_questions if q.get('section') == 'EST']
+    kido_qs = [q for q in all_questions if q.get('section') == 'KIDO']
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f'<div class="stats-box"><h2>{len(all_questions)}</h2><p>Total Questions</p></div>', unsafe_allow_html=True)
     with col2:
         st.markdown(f'<div class="stats-box"><h2>{len(evs_qs)}</h2><p>EVS Questions</p></div>', unsafe_allow_html=True)
     with col3:
         st.markdown(f'<div class="stats-box"><h2>{len(est_qs)}</h2><p>EST Questions</p></div>', unsafe_allow_html=True)
+    with col4:
+        st.markdown(f'<div class="stats-box"><h2>{len(kido_qs)}</h2><p>KIDO Questions</p></div>', unsafe_allow_html=True)
 
     st.markdown("---")
     st.subheader("Configure Your Quiz")
@@ -185,7 +188,7 @@ def home_page(all_questions):
     with col_a:
         section = st.selectbox(
             "Select Section",
-            ["All", "EVS", "EST"],
+            ["All", "EVS", "EST", "KIDO"],
             help="Choose which section to practice"
         )
 
@@ -612,29 +615,40 @@ def pdf_upload_page():
 
         section_default = st.selectbox(
             "Default section for questions in this PDF",
-            ["EVS (Auto-detect EST)", "EST (Auto-detect EVS)"],
-            help="Starting section — the parser auto-switches when it finds 'EVS Questions' or 'EST MCQ' headers in the PDF"
+            ["EVS (Auto-detect EST)", "EST (Auto-detect EVS)", "KIDO"],
+            help="Choose EVS or EST to auto-detect section headers; choose KIDO to tag all questions as KIDO"
         )
-        section_default = "EVS" if "EVS" in section_default else "EST"
+        if "EVS" in section_default:
+            section_default = "EVS"
+        elif "EST" in section_default:
+            section_default = "EST"
+        else:
+            section_default = "KIDO"
 
         if st.button("Parse PDF", type="primary", use_container_width=True):
             with st.spinner("Parsing PDF... This may take a moment for large files."):
                 try:
                     from parse_pdf import parse_from_pdf_bytes
-                    new_questions = parse_from_pdf_bytes(uploaded_file.read(), default_section=section_default)
+                    pdf_bytes = uploaded_file.read()
+                    new_questions, raw_text, extractor = parse_from_pdf_bytes(pdf_bytes, default_section=section_default)
 
                     if len(new_questions) == 0:
                         st.error("No questions could be parsed from the PDF. Please check the format.")
+                        with st.expander("🔍 Debug: raw extracted text (first 3000 chars)"):
+                            st.caption(f"Extractor used: {extractor}")
+                            st.code(raw_text[:3000] if raw_text else "(empty — PDF may be image-based/scanned)")
                         st.markdown("**Troubleshooting tips:**")
                         st.markdown("- Ensure questions are numbered (1, 2, 3...)")
-                        st.markdown("- Options should start with A. B. C. D.")
-                        st.markdown("- Each question needs an answer line")
+                        st.markdown("- Options should be labeled (a) (b) (c) (d) or A. B. C. D.")
+                        st.markdown("- Each question needs an `Answer: (X)` line")
                     else:
                         st.session_state['parsed_questions'] = new_questions
                         st.session_state['pdf_name'] = uploaded_file.name
                         st.rerun()
                 except Exception as e:
                     st.error(f"Error parsing PDF: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
 
     # Show parsed preview
     if 'parsed_questions' in st.session_state and st.session_state['parsed_questions']:
@@ -862,9 +876,11 @@ def sidebar(all_questions):
         st.markdown("**Question Bank:**")
         evs_count = sum(1 for q in all_questions if q.get('section') == 'EVS')
         est_count = sum(1 for q in all_questions if q.get('section') == 'EST')
+        kido_count = sum(1 for q in all_questions if q.get('section') == 'KIDO')
         st.markdown(f"- Total: {len(all_questions)}")
         st.markdown(f"- EVS: {evs_count}")
         st.markdown(f"- EST: {est_count}")
+        st.markdown(f"- KIDO: {kido_count}")
 
         # Quick stats from dashboard
         dash_stats = get_dashboard_stats()
