@@ -598,11 +598,28 @@ def pdf_upload_page():
     st.markdown("""
     **Supported PDF formats:**
     - Questions numbered (1, 2, 3...)
-    - Options labeled A. B. C. D.
-    - Answer line: `Answer optionA` / `Answer: A` / `Correct: A`
+    - Options labeled (a) (b) (c) (d) or A. B. C. D.
+    - Answer line: `Answer: (A)` / `Answer: A` / `Ans: A`
     - Marks line (optional): `Marks: 1` or `Marks: 2`
-    - Section headers containing "EST" will mark subsequent questions as EST (default is EVS)
+    - **Text-based PDFs** parse instantly · **Image/scanned PDFs** use OCR automatically
     """)
+
+    with st.expander("ℹ️ OCR Setup — for scanned / image-based PDFs"):
+        st.markdown("""
+**OCR is built-in** — no extra setup needed for most cases.
+
+The app tries two OCR engines automatically:
+
+| Engine | Speed | Setup |
+|--------|-------|-------|
+| **pytesseract** *(fast)* | ~0.5 s/page | `pip install pytesseract Pillow` + [Tesseract binary](https://github.com/UB-Mannheim/tesseract/wiki) |
+| **easyocr** *(no binary)* | ~3–8 s/page | already installed — downloads ~45 MB model on first use |
+
+**Install Tesseract on Windows (recommended for speed):**
+```
+winget install UB-Mannheim.TesseractOCR
+```
+        """)
 
     uploaded_file = st.file_uploader(
         "Choose a PDF file",
@@ -626,29 +643,56 @@ def pdf_upload_page():
             section_default = "KIDO"
 
         if st.button("Parse PDF", type="primary", use_container_width=True):
-            with st.spinner("Parsing PDF... This may take a moment for large files."):
-                try:
-                    from parse_pdf import parse_from_pdf_bytes
-                    pdf_bytes = uploaded_file.read()
-                    new_questions, raw_text, extractor = parse_from_pdf_bytes(pdf_bytes, default_section=section_default)
+            from parse_pdf import parse_from_pdf_bytes
+            pdf_bytes = uploaded_file.read()
 
-                    if len(new_questions) == 0:
-                        st.error("No questions could be parsed from the PDF. Please check the format.")
-                        with st.expander("🔍 Debug: raw extracted text (first 3000 chars)"):
-                            st.caption(f"Extractor used: {extractor}")
-                            st.code(raw_text[:3000] if raw_text else "(empty — PDF may be image-based/scanned)")
-                        st.markdown("**Troubleshooting tips:**")
-                        st.markdown("- Ensure questions are numbered (1, 2, 3...)")
-                        st.markdown("- Options should be labeled (a) (b) (c) (d) or A. B. C. D.")
-                        st.markdown("- Each question needs an `Answer: (X)` line")
-                    else:
-                        st.session_state['parsed_questions'] = new_questions
-                        st.session_state['pdf_name'] = uploaded_file.name
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Error parsing PDF: {e}")
-                    import traceback
-                    st.code(traceback.format_exc())
+            status_box = st.empty()
+            progress_bar = st.empty()
+            status_box.info("⏳ Extracting text from PDF...")
+
+            def on_progress(current, total):
+                pct = current / total
+                progress_bar.progress(pct, text=f"OCR: page {current} / {total}")
+                status_box.info(f"🔍 Running OCR — page {current} of {total}  (this may take a minute for large files)")
+
+            try:
+                new_questions, raw_text, extractor = parse_from_pdf_bytes(
+                    pdf_bytes,
+                    default_section=section_default,
+                    progress_cb=on_progress,
+                )
+                status_box.empty()
+                progress_bar.empty()
+
+                if len(new_questions) == 0:
+                    st.error("No questions could be parsed from the PDF. Please check the format.")
+                    with st.expander("🔍 Debug: raw extracted text (first 3000 chars)"):
+                        st.caption(f"Extractor used: {extractor}")
+                        st.code(
+                            raw_text[:3000] if raw_text and raw_text.strip()
+                            else "(empty — PDF may use an unsupported encoding)"
+                        )
+                    st.markdown("**Troubleshooting tips:**")
+                    st.markdown("- Ensure questions are numbered (1, 2, 3...)")
+                    st.markdown("- Options should be labeled (a) (b) (c) (d) or A. B. C. D.")
+                    st.markdown("- Each question needs an `Answer: (X)` line")
+                    if "OCR" in extractor:
+                        st.warning(
+                            "OCR was used. If results are empty, install Tesseract for better accuracy: "
+                            "`winget install UB-Mannheim.TesseractOCR`"
+                        )
+                else:
+                    ocr_note = f" via {extractor}" if "OCR" in extractor else ""
+                    st.success(f"Parsed **{len(new_questions)}** questions{ocr_note}")
+                    st.session_state['parsed_questions'] = new_questions
+                    st.session_state['pdf_name'] = uploaded_file.name
+                    st.rerun()
+            except Exception as e:
+                status_box.empty()
+                progress_bar.empty()
+                st.error(f"Error parsing PDF: {e}")
+                import traceback
+                st.code(traceback.format_exc())
 
     # Show parsed preview
     if 'parsed_questions' in st.session_state and st.session_state['parsed_questions']:
