@@ -756,6 +756,40 @@ winget install UB-Mannheim.TesseractOCR
                 st.session_state.pop('pdf_name', None)
                 st.rerun()
 
+    # ── Manage Question Bank ──────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### Manage Question Bank")
+    all_qs = load_questions()
+    sections = sorted({q.get("section", "Unknown") for q in all_qs})
+    section_counts = {s: sum(1 for q in all_qs if q.get("section") == s) for s in sections}
+
+    for sec in sections:
+        col_sec, col_btn = st.columns([3, 1])
+        with col_sec:
+            st.write(f"**{sec}** — {section_counts[sec]} questions")
+        with col_btn:
+            btn_key = f"delete_section_{sec}"
+            confirm_key = f"confirm_delete_{sec}"
+            if st.session_state.get(confirm_key):
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("Yes, delete", key=f"yes_{sec}", type="primary", use_container_width=True):
+                        remaining = [q for q in all_qs if q.get("section") != sec]
+                        for i, q in enumerate(remaining, 1):
+                            q["id"] = i
+                        save_questions(remaining)
+                        st.session_state.pop(confirm_key, None)
+                        st.success(f"Deleted all {section_counts[sec]} {sec} questions.")
+                        st.rerun()
+                with c2:
+                    if st.button("Cancel", key=f"no_{sec}", use_container_width=True):
+                        st.session_state.pop(confirm_key, None)
+                        st.rerun()
+            else:
+                if st.button(f"Delete all {sec}", key=btn_key, use_container_width=True):
+                    st.session_state[confirm_key] = True
+                    st.rerun()
+
 
 # --------------- DASHBOARD ---------------
 
