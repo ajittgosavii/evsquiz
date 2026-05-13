@@ -166,9 +166,10 @@ def home_page(all_questions):
     """Render the home/configuration page."""
     st.markdown('<div class="main-header"><h1>🌿 EVS, EST & KIDO Quiz Engine</h1><p>Environmental Studies Test Platform</p></div>', unsafe_allow_html=True)
 
-    evs_qs = [q for q in all_questions if q.get('section') == 'EVS']
-    est_qs = [q for q in all_questions if q.get('section') == 'EST']
-    kido_qs = [q for q in all_questions if q.get('section') == 'KIDO']
+    evs_qs  = [q for q in all_questions if q.get('section') == 'EVS']
+    est_qs  = [q for q in all_questions if q.get('section') == 'EST']
+    kido_sections = ['KIDO-01', 'KIDO-02', 'KIDO-03', 'KIDO-04', 'KIDO-05']
+    kido_qs = [q for q in all_questions if q.get('section') in kido_sections]
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -188,7 +189,7 @@ def home_page(all_questions):
     with col_a:
         section = st.selectbox(
             "Select Section",
-            ["All", "EVS", "EST", "KIDO"],
+            ["All", "EVS", "EST", "KIDO-01", "KIDO-02", "KIDO-03", "KIDO-04", "KIDO-05"],
             help="Choose which section to practice"
         )
 
@@ -632,15 +633,15 @@ winget install UB-Mannheim.TesseractOCR
 
         section_default = st.selectbox(
             "Default section for questions in this PDF",
-            ["EVS (Auto-detect EST)", "EST (Auto-detect EVS)", "KIDO"],
-            help="Choose EVS or EST to auto-detect section headers; choose KIDO to tag all questions as KIDO"
+            ["EVS (Auto-detect EST)", "EST (Auto-detect EVS)",
+             "KIDO-01", "KIDO-02", "KIDO-03", "KIDO-04", "KIDO-05"],
+            help="Choose EVS or EST to auto-detect section headers; choose a KIDO set to tag all questions with that set number"
         )
         if "EVS" in section_default:
             section_default = "EVS"
         elif "EST" in section_default:
             section_default = "EST"
-        else:
-            section_default = "KIDO"
+        # else: already one of KIDO-01…KIDO-05, use as-is
 
         if st.button("Parse PDF", type="primary", use_container_width=True):
             from parse_pdf import parse_from_pdf_bytes
@@ -952,13 +953,15 @@ def sidebar(all_questions):
             st.markdown("---")
 
         st.markdown("**Question Bank:**")
-        evs_count = sum(1 for q in all_questions if q.get('section') == 'EVS')
-        est_count = sum(1 for q in all_questions if q.get('section') == 'EST')
-        kido_count = sum(1 for q in all_questions if q.get('section') == 'KIDO')
+        evs_count  = sum(1 for q in all_questions if q.get('section') == 'EVS')
+        est_count  = sum(1 for q in all_questions if q.get('section') == 'EST')
+        kido_counts = {s: sum(1 for q in all_questions if q.get('section') == s)
+                       for s in ['KIDO-01', 'KIDO-02', 'KIDO-03', 'KIDO-04', 'KIDO-05']}
         st.markdown(f"- Total: {len(all_questions)}")
         st.markdown(f"- EVS: {evs_count}")
         st.markdown(f"- EST: {est_count}")
-        st.markdown(f"- KIDO: {kido_count}")
+        for kset, cnt in kido_counts.items():
+            st.markdown(f"- {kset}: {cnt}")
 
         # Quick stats from dashboard
         dash_stats = get_dashboard_stats()
